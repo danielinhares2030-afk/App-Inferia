@@ -1,3 +1,2 @@
-export const API_URL = "https://inferia-api.vercel.app/api"; // Lembre-se de mudar para a URL da sua Vercel/Render depois
-export const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dehfdhu76/image/upload";
+export const CLOUD_NAME = "dehfdhu76";
 export const UPLOAD_PRESET = "mangaInferiaUploads";
