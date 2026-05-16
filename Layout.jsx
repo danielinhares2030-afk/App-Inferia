@@ -18,7 +18,7 @@ export const Layout = ({ onLogout, children, currentView, setView }) => {
           <button onClick={() => setView('obras')} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold ${currentView === 'obras' || currentView === 'nova-obra' ? 'bg-[#CC0000]/10 text-[#CC0000] border border-[#CC0000]/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
             <Book size={20} /> Acervo API
           </button>
-          <button className="w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold text-gray-500 hover:text-white hover:bg-white/5 opacity-50 cursor-not-allowed" title="Em breve">
+          <button onClick={() => setView('capitulos')} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold ${currentView === 'capitulos' ? 'bg-[#CC0000]/10 text-[#CC0000] border border-[#CC0000]/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
             <Upload size={20} /> Capítulos
           </button>
         </nav>
