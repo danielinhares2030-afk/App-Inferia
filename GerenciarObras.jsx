@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
+import { db } from './firebase.js';
 import { PlusCircle, Search, Trash2 } from 'lucide-react';
-import { API_URL } from './constants';
 
 export const GerenciarObras = ({ setToast, setView }) => {
   const [obras, setObras] = useState([]);
@@ -9,10 +9,10 @@ export const GerenciarObras = ({ setToast, setView }) => {
 
   const fetchObras = async () => {
     try {
-      const res = await axios.get(`${API_URL}/obras`);
-      setObras(res.data);
+      const snap = await getDocs(collection(db, "obras"));
+      setObras(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
-      setToast({ message: "Erro ao buscar obras da API.", type: "error" });
+      setToast({ message: "Erro ao buscar obras.", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -23,11 +23,11 @@ export const GerenciarObras = ({ setToast, setView }) => {
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir?")) return;
     try {
-      await axios.delete(`${API_URL}/obras/${id}`);
-      setToast({ message: "Obra excluída", type: "success" });
+      await deleteDoc(doc(db, "obras", id));
+      setToast({ message: "Obra apagada com sucesso!", type: "success" });
       fetchObras();
     } catch (error) {
-      setToast({ message: "Erro ao excluir", type: "error" });
+      setToast({ message: "Erro ao excluir.", type: "error" });
     }
   };
 
@@ -60,17 +60,17 @@ export const GerenciarObras = ({ setToast, setView }) => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" className="p-6 text-center text-gray-600 text-sm">Carregando...</td></tr>
+                <tr><td colSpan="5" className="p-6 text-center text-gray-600 text-sm">Carregando do Firebase...</td></tr>
               ) : obras.length === 0 ? (
-                <tr><td colSpan="5" className="p-6 text-center text-gray-600 text-sm">Nenhuma obra.</td></tr>
+                <tr><td colSpan="5" className="p-6 text-center text-gray-600 text-sm">Nenhuma obra no banco.</td></tr>
               ) : (
                 obras.map(obra => (
-                  <tr key={obra.id || obra._id} className="border-b border-gray-800/30 hover:bg-white/[0.02]">
+                  <tr key={obra.id} className="border-b border-gray-800/30 hover:bg-white/[0.02]">
                     <td className="p-3 sm:p-5"><div className="w-10 h-14 bg-gray-900 rounded overflow-hidden border border-gray-700 flex-shrink-0"><img src={obra.capaUrl} alt="Capa" className="w-full h-full object-cover" /></div></td>
                     <td className="p-3 sm:p-5 font-bold text-white max-w-[150px] truncate">{obra.nome}</td>
                     <td className="p-3 sm:p-5"><span className="bg-gray-800/80 px-2 py-1 rounded text-[10px] sm:text-xs text-gray-300 border border-gray-700">{obra.tipo}</span></td>
                     <td className="p-3 sm:p-5"><span className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold border ${obra.status === 'Lançamento' ? 'bg-green-900/20 text-green-400 border-green-900/50' : 'bg-orange-900/20 text-orange-400 border-orange-900/50'}`}>{obra.status}</span></td>
-                    <td className="p-3 sm:p-5 text-right"><button onClick={() => handleDelete(obra.id || obra._id)} className="text-gray-500 hover:text-[#CC0000] p-2"><Trash2 size={18} /></button></td>
+                    <td className="p-3 sm:p-5 text-right"><button onClick={() => handleDelete(obra.id)} className="text-gray-500 hover:text-[#CC0000] p-2"><Trash2 size={18} /></button></td>
                   </tr>
                 ))
               )}
