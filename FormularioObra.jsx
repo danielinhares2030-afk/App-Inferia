@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { collection, addDoc } from "firebase/firestore";
+import { db } from './firebase.js';
+import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js';
 import { Image as ImageIcon, CheckSquare } from 'lucide-react';
-import { API_URL, CLOUDINARY_URL, UPLOAD_PRESET } from './constants';
 
 export const FormularioObra = ({ setToast, setView }) => {
   const [loading, setLoading] = useState(false);
@@ -21,18 +22,25 @@ export const FormularioObra = ({ setToast, setView }) => {
     e.preventDefault();
     if (!file) return setToast({ message: "É obrigatório enviar uma capa!", type: "error" });
     setLoading(true);
+    
     try {
       const uploadData = new FormData();
       uploadData.append("file", file);
       uploadData.append("upload_preset", UPLOAD_PRESET);
-      const resImg = await axios.post(CLOUDINARY_URL, uploadData);
-      const capaUrl = resImg.data.secure_url;
-      const payload = { ...formData, capaUrl, generos: formData.generos.split(',').map(g => g.trim()) };
-      await axios.post(`${API_URL}/obras`, payload);
-      setToast({ message: "Obra cadastrada!", type: "success" });
+      
+      // Monta a URL do Cloudinary dinamicamente para IMAGENS
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+      
+      const resImg = await fetch(cloudinaryUrl, { method: 'POST', body: uploadData });
+      const imgData = await resImg.json();
+      
+      const payload = { ...formData, capaUrl: imgData.secure_url, generos: formData.generos.split(',').map(g => g.trim()) };
+      await addDoc(collection(db, "obras"), payload);
+      
+      setToast({ message: "Obra salva no Banco de Dados!", type: "success" });
       setView('obras');
     } catch (error) {
-      setToast({ message: "Erro na API.", type: "error" });
+      setToast({ message: "Erro ao salvar.", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -72,7 +80,7 @@ export const FormularioObra = ({ setToast, setView }) => {
               </label>
             ))}
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-[#CC0000] hover:bg-red-700 text-white font-black uppercase tracking-widest py-3 sm:py-4 rounded-xl transition-all shadow-[0_5px_15px_rgba(204,0,0,0.3)] disabled:opacity-50 flex justify-center text-sm sm:text-base">{loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SALVAR"}</button>
+          <button type="submit" disabled={loading} className="w-full bg-[#CC0000] hover:bg-red-700 text-white font-black uppercase tracking-widest py-3 sm:py-4 rounded-xl transition-all shadow-[0_5px_15px_rgba(204,0,0,0.3)] disabled:opacity-50 flex justify-center text-sm sm:text-base">{loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "SALVAR NO BANCO"}</button>
         </div>
       </form>
     </div>
