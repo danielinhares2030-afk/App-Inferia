@@ -22,9 +22,8 @@ export const UploadCapitulo = ({ setToast }) => {
     
     setLoading(true);
     try {
-      // O Cloudinary exige o endpoint 'raw' para arquivos zip/cbz, em vez de 'image'
+      // 1. Envia para o Cloudinary (Rota RAW para zips/cbz)
       const rawUploadUrl = CLOUDINARY_URL.replace('/image/upload', '/raw/upload');
-      
       const uploadData = new FormData();
       uploadData.append("file", file);
       uploadData.append("upload_preset", UPLOAD_PRESET);
@@ -32,15 +31,18 @@ export const UploadCapitulo = ({ setToast }) => {
       const res = await axios.post(rawUploadUrl, uploadData);
       const arquivoUrl = res.data.secure_url;
       
-      // Envia a URL do ZIP para a sua API
+      // 2. Envia para a sua API
       const payload = { ...formData, arquivoUrl: arquivoUrl };
       await axios.post(`${API_URL}/capitulos`, payload);
       
-      setToast({ message: "Capítulo em ZIP enviado com sucesso!", type: "success" });
+      setToast({ message: "Capítulo enviado com sucesso!", type: "success" });
       setFormData({ obraId: formData.obraId, numero: '', titulo: '' });
       setFile(null);
     } catch (error) {
-      setToast({ message: "Erro ao enviar capítulo para a API.", type: "error" });
+      console.error(error);
+      // Captura o erro exato para sabermos onde falhou
+      const erroEspecifico = error.response?.data?.error?.message || error.response?.data?.message || error.message;
+      setToast({ message: `Falha: ${erroEspecifico}`, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -73,7 +75,6 @@ export const UploadCapitulo = ({ setToast }) => {
         <div>
           <label className="block text-gray-400 text-xs font-bold mb-3 uppercase tracking-wider">Arquivo do Capítulo (.ZIP ou .CBZ)</label>
           <div className="border-2 border-dashed border-gray-700 rounded-2xl bg-[#111116] flex flex-col items-center justify-center p-6 sm:p-10 relative overflow-hidden group hover:border-purple-500 transition-colors cursor-pointer min-h-[160px] sm:h-56">
-            {/* O accept agora força o celular a procurar arquivos ao invés da galeria de fotos */}
             <input type="file" required accept=".zip,.cbz,application/zip,application/x-zip-compressed" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => setFile(e.target.files[0])} />
             <UploadCloud className="w-10 h-10 sm:w-12 sm:h-12 text-gray-500 group-hover:text-purple-500 transition-colors mb-3 sm:mb-4" />
             <span className="text-xs sm:text-sm font-bold text-gray-300 text-center px-2">Toque para selecionar o arquivo compactado</span>
