@@ -2,7 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from './firebase.js';
 import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js';
-import { UploadCloud, FileArchive } from 'lucide-react';
+import { UploadCloud, FileArchive, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+
+// Função auxiliar de upload igual à do seu app antigo!
+const uploadToCloudinary = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) throw new Error("Falha ao enviar imagem");
+  const data = await response.json();
+  return data.secure_url; 
+};
 
 export const UploadCapitulo = ({ setToast }) => {
   const [obras, setObras] = useState([]);
@@ -12,8 +28,13 @@ export const UploadCapitulo = ({ setToast }) => {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
-  // 1. Puxa a lista de obras
+  // 1. Injeta o JSZip pelo CDN (como no seu app antigo) e puxa as obras
   useEffect(() => {
+    if (!window.JSZip) {
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      document.body.appendChild(script);
+    }
     const fetchObras = async () => {
       try {
         const snap = await getDocs(collection(db, "obras"));
@@ -25,7 +46,7 @@ export const UploadCapitulo = ({ setToast }) => {
     fetchObras();
   }, [setToast]);
 
-  // 2. Quando seleciona a obra, descobre automaticamente o último capítulo!
+  // 2. Descobre o último capítulo automaticamente
   useEffect(() => {
     const fetchUltimoCapitulo = async () => {
       if (!obraSelecionada) return setProximoNumero(1);
@@ -34,10 +55,9 @@ export const UploadCapitulo = ({ setToast }) => {
         const snap = await getDocs(q);
         
         if (!snap.empty) {
-          // Pega todos os números, transforma em int e acha o maior
           const numeros = snap.docs.map(d => parseFloat(d.data().numero) || 0);
           const maior = Math.max(...numeros);
-          setProximoNumero(maior + 1); // Sugere o próximo!
+          setProximoNumero(maior + 1);
         } else {
           setProximoNumero(1);
         }
@@ -52,37 +72,56 @@ export const UploadCapitulo = ({ setToast }) => {
     e.preventDefault();
     if (!obraSelecionada) return setToast({ message: "Selecione uma obra!", type: "error" });
     if (arquivos.length === 0) return setToast({ message: "Selecione os arquivos ZIP!", type: "error" });
+    if (!window.JSZip) return setToast({ message: "Aguarde, sistema a carregar dependências...", type: "info" });
     
     setLoading(true);
     let numeroAtual = parseFloat(proximoNumero);
 
     try {
-      // Loop pelos ZIPs selecionados (Batch Upload de arquivos RAW)
+      // Loop principal pelos ZIPs selecionados
       for (let i = 0; i < arquivos.length; i++) {
         const file = arquivos[i];
-        setStatusMsg(`Cap. ${numeroAtual}: Enviando ZIP pro Cloudinary...`);
+        setStatusMsg(`Cap. ${numeroAtual}: A ler arquivo ${file.name}...`);
         
-        const uploadData = new FormData();
-        uploadData.append("file", file);
-        uploadData.append("upload_preset", UPLOAD_PRESET);
+        // MOTOR ANTIGO: Extraindo o ZIP
+        const zip = new window.JSZip(); 
+        const loadedZip = await zip.loadAsync(file); 
+        const imageFiles = [];
+        
+        loadedZip.forEach((relativePath, zipEntry) => { 
+          if (!zipEntry.dir && relativePath.match(/\.(jpg|jpeg|png|webp)$/i)) {
+            imageFiles.push(zipEntry); 
+          }
+        });
+        
+        if (imageFiles.length === 0) throw new Error(`O ficheiro ${file.name} não tem imagens.`);
+        
+        // Organiza a ordem das páginas
+        imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        const uploadedUrls = [];
 
-        // Volta a usar a rota RAW para ZIPs/CBZs
-        const rawUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`;
-        
-        const res = await fetch(rawUploadUrl, { method: 'POST', body: uploadData });
-        const cloudinaryData = await res.json();
-        
-        if (cloudinaryData.error) {
-          throw new Error(cloudinaryData.error.message);
+        // MOTOR ANTIGO: Batch Upload (De 30 em 30 imagens!) - Super rápido e à prova de travamentos
+        for (let j = 0; j < imageFiles.length; j += 30) {
+          setStatusMsg(`Cap. ${numeroAtual}: Extraindo e enviando imagens ${j + 1} a ${Math.min(j + 30, imageFiles.length)}...`);
+          const chunk = imageFiles.slice(j, j + 30);
+          
+          const promises = chunk.map(async (entry) => { 
+            const blob = await entry.async("blob"); 
+            const f = new File([blob], entry.name, { type: blob.type }); 
+            return uploadToCloudinary(f); 
+          });
+          
+          const urls = await Promise.all(promises); 
+          uploadedUrls.push(...urls);
         }
 
         setStatusMsg(`Cap. ${numeroAtual}: Salvando no banco de dados...`);
         
-        // Salva o link do ZIP inteiro no banco de dados
+        // Salva as imagens e o capítulo no Firestore
         await addDoc(collection(db, "capitulos"), {
           obraId: obraSelecionada,
           numero: numeroAtual,
-          arquivoUrl: cloudinaryData.secure_url, // Link do ZIP no Cloudinary
+          paginas: uploadedUrls, // Array com todas as imagens prontas!
           dataUpload: new Date().toISOString()
         });
 
@@ -118,14 +157,13 @@ export const UploadCapitulo = ({ setToast }) => {
           <div>
             <label className="block text-[#CC0000] text-xs font-black mb-3 uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>Capítulo Inicial</label>
             <input type="number" step="0.1" required className="w-full bg-[#050508] border border-gray-800 rounded-xl p-4 text-white outline-none focus:border-[#CC0000] focus:shadow-[0_0_15px_rgba(204,0,0,0.2)] transition-all font-black text-xl" value={proximoNumero} onChange={e => setProximoNumero(e.target.value)} />
-            <span className="text-xs text-gray-500 mt-2 block font-bold">Autopreenchido! Se upar múltiplos ZIPs, eles seguirão esta sequência (Ex: 5, 6, 7...)</span>
+            <span className="text-xs text-gray-500 mt-2 block font-bold">Autopreenchido! Os múltiplos ZIPs seguirão esta sequência (Ex: 5, 6, 7...)</span>
           </div>
         </div>
 
         <div>
           <label className="block text-[#CC0000] text-xs font-black mb-3 uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>Arquivos dos Capítulos (.ZIP / .CBZ)</label>
           <div className="border-2 border-dashed border-gray-800 rounded-2xl bg-[#050508] flex flex-col items-center justify-center p-8 sm:p-10 relative overflow-hidden group hover:border-[#CC0000] transition-all cursor-pointer min-h-[200px]">
-            {/* INPUT MULTIPLE PARA SELECIONAR VÁRIOS ZIPS AO MESMO TEMPO */}
             <input id="file-upload" type="file" required multiple accept=".zip,.cbz" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => setArquivos(Array.from(e.target.files))} />
             
             <UploadCloud className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 group-hover:text-[#CC0000] transition-colors mb-4 drop-shadow-[0_0_10px_rgba(204,0,0,0.5)]" />
@@ -148,7 +186,7 @@ export const UploadCapitulo = ({ setToast }) => {
               <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin mb-1"></div>
               <span className="text-xs tracking-widest">{statusMsg}</span>
             </>
-          ) : "INICIAR UPLOAD"}
+          ) : "INICIAR UPLOAD EM MASSA"}
         </button>
       </form>
     </div>
