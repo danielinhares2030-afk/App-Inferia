@@ -33,19 +33,14 @@ export const FormularioObra = ({ setToast, setView }) => {
       const resImg = await fetch(cloudinaryUrl, { method: 'POST', body: uploadData });
       const imgData = await resImg.json();
       
-      if (imgData.error) {
-        throw new Error(`Cloudinary: ${imgData.error.message}`);
-      }
-      
       const payload = { ...formData, capaUrl: imgData.secure_url, generos: formData.generos.split(',').map(g => g.trim()) };
       await addDoc(collection(db, "obras"), payload);
       
       setToast({ message: "Obra salva no Banco de Dados!", type: "success" });
       setView('obras');
     } catch (error) {
-      console.error(error);
-      // Aqui está o nosso detetive! Ele vai mostrar o motivo exato da falha.
-      setToast({ message: `Erro: ${error.message}`, type: "error" });
+      // Retiramos o detetive. Mensagem genérica restaurada.
+      setToast({ message: "Erro ao salvar.", type: "error" });
     } finally {
       setLoading(false);
     }
