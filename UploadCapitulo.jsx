@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { collection, addDoc, getDocs } from "firebase/firestore";
+import { db } from './firebase.js'; 
+import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js'; 
 import { UploadCloud, FileArchive } from 'lucide-react';
-import { API_URL, CLOUDINARY_URL, UPLOAD_PRESET } from './constants.js';
 
 export const UploadCapitulo = ({ setToast }) => {
   const [obras, setObras] = useState([]);
@@ -10,39 +11,62 @@ export const UploadCapitulo = ({ setToast }) => {
   const [formData, setFormData] = useState({ obraId: '', numero: '', titulo: '' });
 
   useEffect(() => {
-    axios.get(`${API_URL}/obras`)
-      .then(res => setObras(res.data))
-      .catch(() => setToast({ message: "Aviso: Não foi possível carregar as obras.", type: "error" }));
+    const fetchObras = async () => {
+      try {
+        const snap = await getDocs(collection(db, "obras"));
+        setObras(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        setToast({ message: "Erro ao carregar as obras do banco de dados.", type: "error" });
+      }
+    };
+    fetchObras();
   }, [setToast]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.obraId) return setToast({ message: "Selecione a obra antes de enviar o capítulo.", type: "error" });
+    if (!formData.obraId) return setToast({ message: "Selecione a obra antes de enviar.", type: "error" });
     if (!file) return setToast({ message: "Selecione o arquivo .ZIP ou .CBZ!", type: "error" });
     
     setLoading(true);
+    setToast({ message: "Enviando arquivo para o Cloudinary...", type: "success" }); 
+
     try {
-      // 1. Envia para o Cloudinary (Rota RAW para zips/cbz)
-      const rawUploadUrl = CLOUDINARY_URL.replace('/image/upload', '/raw/upload');
       const uploadData = new FormData();
       uploadData.append("file", file);
       uploadData.append("upload_preset", UPLOAD_PRESET);
       
-      const res = await axios.post(rawUploadUrl, uploadData);
-      const arquivoUrl = res.data.secure_url;
+      // Monta a URL do Cloudinary dinamicamente para arquivos RAW (.zip / .cbz)
+      const rawUploadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`;
       
-      // 2. Envia para a sua API
-      const payload = { ...formData, arquivoUrl: arquivoUrl };
-      await axios.post(`${API_URL}/capitulos`, payload);
+      const res = await fetch(rawUploadUrl, { 
+        method: 'POST', 
+        body: uploadData 
+      });
       
-      setToast({ message: "Capítulo enviado com sucesso!", type: "success" });
+      const cloudinaryData = await res.json();
+      
+      if (cloudinaryData.error) {
+        throw new Error(cloudinaryData.error.message);
+      }
+
+      const arquivoUrl = cloudinaryData.secure_url;
+      
+      const payload = { 
+        obraId: formData.obraId,
+        numero: formData.numero,
+        titulo: formData.titulo,
+        arquivoUrl: arquivoUrl, 
+        dataUpload: new Date().toISOString() 
+      };
+      
+      await addDoc(collection(db, "capitulos"), payload);
+      
+      setToast({ message: "Capítulo salvo com sucesso no banco!", type: "success" });
       setFormData({ obraId: formData.obraId, numero: '', titulo: '' });
       setFile(null);
+      
     } catch (error) {
-      console.error(error);
-      // Captura o erro exato para sabermos onde falhou
-      const erroEspecifico = error.response?.data?.error?.message || error.response?.data?.message || error.message;
-      setToast({ message: `Falha: ${erroEspecifico}`, type: "error" });
+      setToast({ message: `Falha: ${error.message}`, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -57,7 +81,7 @@ export const UploadCapitulo = ({ setToast }) => {
           <label className="block text-gray-400 text-xs font-bold mb-2 uppercase tracking-wider">Vincular a qual Obra?</label>
           <select required className="w-full bg-[#111116] border border-gray-800 rounded-xl p-3 sm:p-4 text-white outline-none focus:border-purple-500 transition-colors text-sm sm:text-base" value={formData.obraId} onChange={e => setFormData({...formData, obraId: e.target.value})}>
             <option value="">-- Selecione uma obra --</option>
-            {obras.map(obra => <option key={obra._id || obra.id} value={obra._id || obra.id}>{obra.nome}</option>)}
+            {obras.map(obra => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
           </select>
         </div>
 
@@ -86,8 +110,8 @@ export const UploadCapitulo = ({ setToast }) => {
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_5px_15px_rgba(168,85,247,0.3)] disabled:opacity-50 flex justify-center mt-6 text-sm sm:text-base">
-          {loading ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "FAZER UPLOAD DO ARQUIVO"}
+        <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-[#ff1a1a] text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all shadow-[0_5px_15px_rgba(204,0,0,0.3)] disabled:opacity-50 flex justify-center text-sm sm:text-base">
+          {loading ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : "PUBLICAR CAPÍTULO"}
         </button>
       </form>
     </div>
