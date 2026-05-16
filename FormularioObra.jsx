@@ -28,11 +28,14 @@ export const FormularioObra = ({ setToast, setView }) => {
       uploadData.append("file", file);
       uploadData.append("upload_preset", UPLOAD_PRESET);
       
-      // Monta a URL do Cloudinary dinamicamente para IMAGENS
       const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
       
       const resImg = await fetch(cloudinaryUrl, { method: 'POST', body: uploadData });
       const imgData = await resImg.json();
+      
+      if (imgData.error) {
+        throw new Error(`Cloudinary: ${imgData.error.message}`);
+      }
       
       const payload = { ...formData, capaUrl: imgData.secure_url, generos: formData.generos.split(',').map(g => g.trim()) };
       await addDoc(collection(db, "obras"), payload);
@@ -40,7 +43,9 @@ export const FormularioObra = ({ setToast, setView }) => {
       setToast({ message: "Obra salva no Banco de Dados!", type: "success" });
       setView('obras');
     } catch (error) {
-      setToast({ message: "Erro ao salvar.", type: "error" });
+      console.error(error);
+      // Aqui está o nosso detetive! Ele vai mostrar o motivo exato da falha.
+      setToast({ message: `Erro: ${error.message}`, type: "error" });
     } finally {
       setLoading(false);
     }
