@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { collection, getDocs } from "firebase/firestore";
+import { db } from './firebase.js';
 import { Book, Upload } from 'lucide-react';
-import { API_URL } from './constants';
 
 export const Dashboard = ({ setToast }) => {
   const [stats, setStats] = useState({ obras: 0, capitulos: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`${API_URL}/estatisticas`)
-      .then(res => setStats(res.data))
-      .catch(() => setToast({ message: "Erro ao conectar com a API.", type: "error" }))
-      .finally(() => setLoading(false));
+    const fetchStats = async () => {
+      try {
+        const obrasSnap = await getDocs(collection(db, "obras"));
+        const capitulosSnap = await getDocs(collection(db, "capitulos"));
+        setStats({ obras: obrasSnap.size, capitulos: capitulosSnap.size });
+      } catch (error) {
+        setToast({ message: "Erro ao ler dados do banco de dados.", type: "error" });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
   }, [setToast]);
 
   return (
@@ -21,22 +29,22 @@ export const Dashboard = ({ setToast }) => {
         <div className="text-gray-500 text-sm sm:text-base flex items-center gap-3"><div className="w-5 h-5 border-2 border-[#CC0000] border-t-transparent rounded-full animate-spin"></div> Carregando...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <div className="bg-[#0a0a0f] border border-gray-800/60 p-5 sm:p-8 rounded-2xl flex items-center space-x-4 sm:space-x-6 relative overflow-hidden group shadow-lg">
+          <div className="bg-[#0a0a0f] border border-gray-800/60 p-5 sm:p-8 rounded-2xl flex items-center space-x-4 sm:space-x-6 shadow-lg">
             <div className="p-3 sm:p-5 bg-[#1a0a0a] border border-[#CC0000]/30 rounded-xl sm:rounded-2xl text-[#CC0000]">
               <Book size={28} className="sm:w-8 sm:h-8" />
             </div>
             <div className="min-w-0">
               <p className="text-gray-400 text-xs sm:text-sm font-bold uppercase tracking-widest mb-1 truncate">Total de Obras</p>
-              <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white truncate">{stats.obras || 0}</p>
+              <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white truncate">{stats.obras}</p>
             </div>
           </div>
-          <div className="bg-[#0a0a0f] border border-gray-800/60 p-5 sm:p-8 rounded-2xl flex items-center space-x-4 sm:space-x-6 relative overflow-hidden group shadow-lg">
+          <div className="bg-[#0a0a0f] border border-gray-800/60 p-5 sm:p-8 rounded-2xl flex items-center space-x-4 sm:space-x-6 shadow-lg">
             <div className="p-3 sm:p-5 bg-[#0a051a] border border-purple-500/30 rounded-xl sm:rounded-2xl text-purple-500">
               <Upload size={28} className="sm:w-8 sm:h-8" />
             </div>
             <div className="min-w-0">
               <p className="text-gray-400 text-xs sm:text-sm font-bold uppercase tracking-widest mb-1 truncate">Capítulos</p>
-              <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white truncate">{stats.capitulos || 0}</p>
+              <p className="text-3xl sm:text-4xl md:text-5xl font-black text-white truncate">{stats.capitulos}</p>
             </div>
           </div>
         </div>
