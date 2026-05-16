@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase';
-import { Toast } from './Toast';
-import { Layout } from './Layout';
-import { Login } from './Login';
-import { Dashboard } from './Dashboard';
-import { GerenciarObras } from './GerenciarObras';
-import { FormularioObra } from './FormularioObra';
+import { auth } from './firebase.js';
+import { Toast } from './Toast.jsx';
+import { Layout } from './Layout.jsx';
+import { Login } from './Login.jsx';
+import { Dashboard } from './Dashboard.jsx';
+import { GerenciarObras } from './GerenciarObras.jsx';
+import { FormularioObra } from './FormularioObra.jsx';
+import { UploadCapitulo } from './UploadCapitulo.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -51,6 +52,7 @@ export default function App() {
         {view === 'dashboard' && <Dashboard setToast={showToast} />}
         {view === 'obras' && <GerenciarObras setToast={showToast} setView={setView} />}
         {view === 'nova-obra' && <FormularioObra setToast={showToast} setView={setView} />}
+        {view === 'capitulos' && <UploadCapitulo setToast={showToast} setView={setView} />}
       </Layout>
     </>
   );
