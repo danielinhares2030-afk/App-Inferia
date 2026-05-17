@@ -4,7 +4,6 @@ import { db } from './firebase.js';
 import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js';
 import { UploadCloud, FileArchive, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
-// Função auxiliar de upload igual à do seu app antigo!
 const uploadToCloudinary = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -28,7 +27,6 @@ export const UploadCapitulo = ({ setToast }) => {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
-  // 1. Injeta o JSZip pelo CDN (como no seu app antigo) e puxa as obras
   useEffect(() => {
     if (!window.JSZip) {
       const script = document.createElement('script');
@@ -46,7 +44,6 @@ export const UploadCapitulo = ({ setToast }) => {
     fetchObras();
   }, [setToast]);
 
-  // 2. Descobre o último capítulo automaticamente
   useEffect(() => {
     const fetchUltimoCapitulo = async () => {
       if (!obraSelecionada) return setProximoNumero(1);
@@ -78,29 +75,26 @@ export const UploadCapitulo = ({ setToast }) => {
     let numeroAtual = parseFloat(proximoNumero);
 
     try {
-      // Loop principal pelos ZIPs selecionados
       for (let i = 0; i < arquivos.length; i++) {
         const file = arquivos[i];
         setStatusMsg(`Cap. ${numeroAtual}: A ler arquivo ${file.name}...`);
         
-        // MOTOR ANTIGO: Extraindo o ZIP
         const zip = new window.JSZip(); 
         const loadedZip = await zip.loadAsync(file); 
         const imageFiles = [];
         
         loadedZip.forEach((relativePath, zipEntry) => { 
-          if (!zipEntry.dir && relativePath.match(/\.(jpg|jpeg|png|webp)$/i)) {
+          // 🔥 A MÁGICA ESTÁ AQUI: Adicionado avif e gif no filtro de extração!
+          if (!zipEntry.dir && relativePath.match(/\.(jpg|jpeg|png|webp|avif|gif)$/i)) {
             imageFiles.push(zipEntry); 
           }
         });
         
-        if (imageFiles.length === 0) throw new Error(`O ficheiro ${file.name} não tem imagens.`);
+        if (imageFiles.length === 0) throw new Error(`O ficheiro ${file.name} não tem imagens suportadas.`);
         
-        // Organiza a ordem das páginas
         imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
         const uploadedUrls = [];
 
-        // MOTOR ANTIGO: Batch Upload (De 30 em 30 imagens!) - Super rápido e à prova de travamentos
         for (let j = 0; j < imageFiles.length; j += 30) {
           setStatusMsg(`Cap. ${numeroAtual}: Extraindo e enviando imagens ${j + 1} a ${Math.min(j + 30, imageFiles.length)}...`);
           const chunk = imageFiles.slice(j, j + 30);
@@ -117,15 +111,14 @@ export const UploadCapitulo = ({ setToast }) => {
 
         setStatusMsg(`Cap. ${numeroAtual}: Salvando no banco de dados...`);
         
-        // Salva as imagens e o capítulo no Firestore
         await addDoc(collection(db, "capitulos"), {
           obraId: obraSelecionada,
           numero: numeroAtual,
-          paginas: uploadedUrls, // Array com todas as imagens prontas!
+          paginas: uploadedUrls, 
           dataUpload: new Date().toISOString()
         });
 
-        numeroAtual++; // Próximo arquivo recebe o número seguinte
+        numeroAtual++; 
       }
       
       setToast({ message: `${arquivos.length} Capítulo(s) upado(s) com sucesso!`, type: "success" });
