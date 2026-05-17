@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from './firebase.js';
 import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js';
-import { UploadCloud, FileArchive, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, FileArchive, Loader2 } from 'lucide-react';
 
 const uploadToCloudinary = async (file) => {
   const formData = new FormData();
@@ -65,6 +65,16 @@ export const UploadCapitulo = ({ setToast }) => {
     fetchUltimoCapitulo();
   }, [obraSelecionada]);
 
+  // Função disparada ao selecionar os arquivos
+  const handleFileChange = (e) => {
+    const listaArquivos = Array.from(e.target.files);
+    
+    // 🔥 ORDENAÇÃO AUTOMÁTICA DOS CAPÍTULOS POR NOME (Ex: Cap 1, Cap 2, Cap 3...)
+    listaArquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    
+    setArquivos(listaArquivos);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!obraSelecionada) return setToast({ message: "Selecione uma obra!", type: "error" });
@@ -77,14 +87,13 @@ export const UploadCapitulo = ({ setToast }) => {
     try {
       for (let i = 0; i < arquivos.length; i++) {
         const file = arquivos[i];
-        setStatusMsg(`Cap. ${numeroAtual}: A ler arquivo ${file.name}...`);
+        setStatusMsg(`Cap. ${numeroAtual}: A processar arquivo ordenado [${file.name}]...`);
         
         const zip = new window.JSZip(); 
         const loadedZip = await zip.loadAsync(file); 
         const imageFiles = [];
         
         loadedZip.forEach((relativePath, zipEntry) => { 
-          // 🔥 A MÁGICA ESTÁ AQUI: Adicionado avif e gif no filtro de extração!
           if (!zipEntry.dir && relativePath.match(/\.(jpg|jpeg|png|webp|avif|gif)$/i)) {
             imageFiles.push(zipEntry); 
           }
@@ -92,11 +101,12 @@ export const UploadCapitulo = ({ setToast }) => {
         
         if (imageFiles.length === 0) throw new Error(`O ficheiro ${file.name} não tem imagens suportadas.`);
         
+        // Ordena as páginas internas do capítulo
         imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
         const uploadedUrls = [];
 
         for (let j = 0; j < imageFiles.length; j += 30) {
-          setStatusMsg(`Cap. ${numeroAtual}: Extraindo e enviando imagens ${j + 1} a ${Math.min(j + 30, imageFiles.length)}...`);
+          setStatusMsg(`Cap. ${numeroAtual}: Enviando imagens ${j + 1} a ${Math.min(j + 30, imageFiles.length)}...`);
           const chunk = imageFiles.slice(j, j + 30);
           
           const promises = chunk.map(async (entry) => { 
@@ -118,10 +128,11 @@ export const UploadCapitulo = ({ setToast }) => {
           dataUpload: new Date().toISOString()
         });
 
+        // Como a lista já está ordenada por nome, o próximo arquivo ganha o número seguinte perfeitamente
         numeroAtual++; 
       }
       
-      setToast({ message: `${arquivos.length} Capítulo(s) upado(s) com sucesso!`, type: "success" });
+      setToast({ message: `🚀 ${arquivos.length} Capítulo(s) organizados e salvos com sucesso!`, type: "success" });
       setArquivos([]);
       setProximoNumero(numeroAtual);
       document.getElementById('file-upload').value = ''; 
@@ -150,23 +161,24 @@ export const UploadCapitulo = ({ setToast }) => {
           <div>
             <label className="block text-[#CC0000] text-xs font-black mb-3 uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>Capítulo Inicial</label>
             <input type="number" step="0.1" required className="w-full bg-[#050508] border border-gray-800 rounded-xl p-4 text-white outline-none focus:border-[#CC0000] focus:shadow-[0_0_15px_rgba(204,0,0,0.2)] transition-all font-black text-xl" value={proximoNumero} onChange={e => setProximoNumero(e.target.value)} />
-            <span className="text-xs text-gray-500 mt-2 block font-bold">Autopreenchido! Os múltiplos ZIPs seguirão esta sequência (Ex: 5, 6, 7...)</span>
+            <span className="text-xs text-gray-500 mt-2 block font-bold">Autopreenchido! Os múltiplos ZIPs seguirão a sequência correta de forma automática.</span>
           </div>
         </div>
 
         <div>
           <label className="block text-[#CC0000] text-xs font-black mb-3 uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>Arquivos dos Capítulos (.ZIP / .CBZ)</label>
           <div className="border-2 border-dashed border-gray-800 rounded-2xl bg-[#050508] flex flex-col items-center justify-center p-8 sm:p-10 relative overflow-hidden group hover:border-[#CC0000] transition-all cursor-pointer min-h-[200px]">
-            <input id="file-upload" type="file" required multiple accept=".zip,.cbz" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => setArquivos(Array.from(e.target.files))} />
+            {/* Trocado para chamar a função com o classificador inteligente */}
+            <input id="file-upload" type="file" required multiple accept=".zip,.cbz" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleFileChange} />
             
             <UploadCloud className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 group-hover:text-[#CC0000] transition-colors mb-4 drop-shadow-[0_0_10px_rgba(204,0,0,0.5)]" />
             <span className="text-xs sm:text-sm font-black text-white uppercase tracking-widest text-center px-2" style={{ fontFamily: "'Orbitron', sans-serif" }}>Arraste os arquivos ou Toque aqui</span>
             
             {arquivos.length > 0 && (
-              <div className="mt-6 w-full max-w-md bg-[#0a0a0f] p-4 rounded-xl border border-gray-800 max-h-32 overflow-y-auto">
-                <p className="text-xs text-[#CC0000] font-bold mb-2 uppercase tracking-wider">{arquivos.length} Arquivo(s) Selecionado(s):</p>
+              <div className="mt-6 w-full max-w-md bg-[#0a0a0f] p-4 rounded-xl border border-gray-800 max-h-40 overflow-y-auto">
+                <p className="text-xs text-green-400 font-bold mb-2 uppercase tracking-wider">✓ {arquivos.length} Arquivo(s) Ordenados Automaticamente:</p>
                 {arquivos.map((file, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-gray-300 font-bold mb-1 truncate"><FileArchive size={14} className="text-[#CC0000] flex-shrink-0"/> {file.name}</div>
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-300 font-medium mb-1 truncate"><FileArchive size={14} className="text-[#CC0000] flex-shrink-0"/> {file.name}</div>
                 ))}
               </div>
             )}
