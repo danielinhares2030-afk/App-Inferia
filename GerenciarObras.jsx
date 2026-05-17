@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from './firebase.js';
 import { CLOUD_NAME, UPLOAD_PRESET } from './constants.js';
-import { PlusCircle, Search, Trash2, Edit3, X, Image as ImageIcon, CheckSquare, Flame } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Edit3, X, Image as ImageIcon, CheckSquare, Flame, Loader2 } from 'lucide-react';
 
 export const GerenciarObras = ({ setToast, setView }) => {
   const [obras, setObras] = useState([]);
@@ -33,7 +33,7 @@ export const GerenciarObras = ({ setToast, setView }) => {
     if (!window.confirm("Tem certeza que deseja excluir esta obra permanentemente?")) return;
     try {
       await deleteDoc(doc(db, "obras", id));
-      setToast({ message: "Obra apagada com sucesso!", type: "success" });
+      setToast({ message: "💥 Obra banida do acervo com sucesso!", type: "success" });
       fetchObras();
     } catch (error) {
       setToast({ message: "Erro ao excluir.", type: "error" });
@@ -73,7 +73,7 @@ export const GerenciarObras = ({ setToast, setView }) => {
     try {
       let finalCapaUrl = obraParaEditar.capaUrl;
 
-      // Se o usuário selecionou uma nova foto de capa, faz o upload pro Cloudinary
+      // Se selecionou uma nova foto de capa, faz o upload pro Cloudinary
       if (editFile) {
         const uploadData = new FormData();
         uploadData.append("file", editFile);
@@ -87,7 +87,6 @@ export const GerenciarObras = ({ setToast, setView }) => {
         finalCapaUrl = imgData.secure_url;
       }
 
-      // Monta o objeto formatado para atualizar o Firestore
       const payload = {
         nome: editFormData.nome,
         descricao: editFormData.descricao,
@@ -103,17 +102,22 @@ export const GerenciarObras = ({ setToast, setView }) => {
 
       await updateDoc(doc(db, "obras", obraParaEditar.id), payload);
       
-      setToast({ message: "Alterações salvas com sucesso!", type: "success" });
+      // 1. FECHA A TELA DE ALTERAÇÃO IMEDIATAMENTE
       setObraParaEditar(null);
-      fetchObras(); // Atualiza a lista na tela
+      
+      // 2. EXIBE A MENSAGEM BONITA E ESTILIZADA
+      setToast({ message: "🔥 OBRA REFORJADA COM SUCESSO NO BANCO INFERIA!", type: "success" });
+      
+      // 3. ATUALIZA A LISTAGEM DE FUNDO
+      fetchObras(); 
     } catch (error) {
-      setToast({ message: `Falha ao atualizar: ${error.message}`, type: "error" });
-    } {
+      setToast({ message: `❌ Falha ao atualizar: ${error.message}`, type: "error" });
+    } finally {
+      // CORRIGIDO: O bloco finally agora está correto e impede a tela preta
       setEditLoading(false);
     }
   };
 
-  // Filtra as obras dinamicamente com base no input de pesquisa
   const obrasFiltradas = obras.filter(obra => 
     obra.nome?.toLowerCase().includes(pesquisa.toLowerCase())
   );
@@ -121,7 +125,6 @@ export const GerenciarObras = ({ setToast, setView }) => {
   return (
     <div className="space-y-6 sm:space-y-10 animate-in fade-in w-full max-w-full relative">
       
-      {/* Topo do Controle */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-6 sm:mb-8 gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-wider break-words" style={{ fontFamily: "'Orbitron', sans-serif" }}>Acervo de Obras</h2>
@@ -132,7 +135,6 @@ export const GerenciarObras = ({ setToast, setView }) => {
         </button>
       </div>
 
-      {/* Caixa de Pesquisa e Tabela */}
       <div className="bg-[#0a0a0f] border border-gray-800/60 rounded-2xl overflow-hidden shadow-xl w-full">
         <div className="p-3 sm:p-5 border-b border-gray-800/60 bg-[#111116] flex items-center">
           <Search size={20} className="text-gray-500 mr-3 flex-shrink-0" />
@@ -174,10 +176,10 @@ export const GerenciarObras = ({ setToast, setView }) => {
         </div>
       </div>
 
-      {/* MODAL DE EDIÇÃO CYBERPUNK DARK (Aparece por cima ao clicar no lápis) */}
+      {/* MODAL DE EDIÇÃO CYBERPUNK DARK */}
       {obraParaEditar && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0a0a0f] border border-[#CC0000]/30 w-full max-w-5xl rounded-2xl shadow-[0_0_5px_rgba(204,0,0,0.2)] max-h-[90vh] overflow-y-auto relative p-6 sm:p-8 space-y-6">
+          <div className="bg-[#0a0a0f] border border-[#CC0000]/30 w-full max-w-5xl rounded-2xl shadow-[0_0_25px_rgba(204,0,0,0.15)] max-h-[90vh] overflow-y-auto relative p-6 sm:p-8 space-y-6">
             
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#CC0000] to-transparent"></div>
             
@@ -187,7 +189,6 @@ export const GerenciarObras = ({ setToast, setView }) => {
             </div>
 
             <form onSubmit={handleSalvarEdicao} className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-              {/* Coluna de textos */}
               <div className="lg:col-span-2 space-y-5">
                 <div>
                   <label className="block text-[#CC0000] text-xs font-black mb-2 uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>Título</label>
@@ -217,7 +218,6 @@ export const GerenciarObras = ({ setToast, setView }) => {
                 </div>
               </div>
 
-              {/* Coluna de Mídias e Tags */}
               <div className="space-y-5">
                 <div>
                   <label className="block text-[#CC0000] text-xs font-black mb-2 uppercase tracking-widest text-center" style={{ fontFamily: "'Orbitron', sans-serif" }}>Capa da Obra</label>
@@ -229,7 +229,7 @@ export const GerenciarObras = ({ setToast, setView }) => {
                       <div className="text-center text-gray-600"><ImageIcon size={32} className="mx-auto mb-2"/><span className="text-xs font-bold">Alterar Mídia</span></div>
                     )}
                   </div>
-                  <span className="text-[10px] text-gray-500 text-center block mt-2">Clique sobre a imagem acima se desejar substituir a foto atual.</span>
+                  <span className="text-[10px] text-gray-500 text-center block mt-2">Toque na imagem acima se desejar substituir a foto atual.</span>
                 </div>
 
                 <div className="bg-[#050508] p-4 rounded-xl border border-gray-800/80 space-y-3">
@@ -239,21 +239,24 @@ export const GerenciarObras = ({ setToast, setView }) => {
                     { id: 'isCarousel', label: 'Banner Gigante' },
                     { id: 'isDestaque', label: 'Em Destaque' },
                     { id: 'isRecente', label: 'Mais Recentes' },
-                    { id: 'isOriginal', label: 'Atualizações' } // Adaptado para a sua estrutura booleana externa
-                  ].map(tag => (
-                    <label key={tag.id} className="flex items-center gap-3 cursor-pointer group bg-[#0a0a0f] p-2.5 rounded-lg border border-gray-900 hover:border-gray-800 transition-all">
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${editFormData[tag.id] ? 'bg-[#CC0000] border-[#CC0000]' : 'bg-transparent border-gray-700'}`}>
-                        {editFormData[tag.id] && <CheckSquare size={12} className="text-white" />}
-                      </div>
-                      <span className="text-gray-400 text-xs font-bold uppercase tracking-wider select-none">{tag.label}</span>
-                      <input type="checkbox" className="hidden" checked={editFormData[tag.id] || false} onChange={e => setEditFormData({...editFormData, [tag.id]: e.target.checked})} />
-                    </label>
-                  ))}
+                    { id: 'isBBQ', label: 'Atualizações' } // Sincronizado perfeitamente com a estrutura booleana externa
+                  ].map(tag => {
+                    const dbId = tag.id === 'isBBQ' ? 'isAtualizado' : tag.id;
+                    return (
+                      <label key={tag.id} className="flex items-center gap-3 cursor-pointer group bg-[#0a0a0f] p-2.5 rounded-lg border border-gray-900 hover:border-gray-800 transition-all">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${editFormData[dbId] ? 'bg-[#CC0000] border-[#CC0000] shadow-[0_0_8px_rgba(204,0,0,0.5)]' : 'bg-transparent border-gray-700'}`}>
+                          {editFormData[dbId] && <CheckSquare size={12} className="text-white" />}
+                        </div>
+                        <span className="text-gray-400 text-xs font-bold uppercase tracking-wider select-none">{tag.label}</span>
+                        <input type="checkbox" className="hidden" checked={editFormData[dbId] || false} onChange={e => setEditFormData({...editFormData, [dbId]: e.target.checked})} />
+                      </label>
+                    );
+                  })}
                 </div>
 
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setObraParaEditar(null)} className="w-1/3 bg-gray-900 hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl transition-colors text-xs uppercase tracking-wider">Cancelar</button>
-                  <button type="submit" disabled={editLoading} className="w-2/3 bg-[#CC0000] hover:bg-red-700 text-white font-black py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(204,0,0,0.3)] disabled:opacity-50 flex justify-center items-center text-xs uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                  <button type="submit" disabled={editLoading} className="w-2/3 bg-[#CC0000] hover:bg-red-700 text-white font-black py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(204,0,0,0.3)] disabled:opacity-50 flex justify-center items-center gap-2 text-xs uppercase tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
                     {editLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : "Confirmar Forja"}
                   </button>
                 </div>
