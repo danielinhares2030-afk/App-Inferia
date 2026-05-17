@@ -48,7 +48,7 @@ export const GerenciarObras = ({ setToast, setView }) => {
     setEditFormData({
       nome: obra.nome || '',
       descricao: obra.descricao || '',
-      tipo: obra.tipo || 'Mangá',
+      tipo: obra.tipo || 'Manga',
       status: obra.status || 'Lançamento',
       generos: Array.isArray(obra.generos) ? obra.generos.join(', ') : '',
       isCarousel: obra.isCarousel || false,
